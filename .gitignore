@@ -1,0 +1,15 @@
+# misc
+uORF_explorer/
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+
+# tooling
+.venv/
+.pytest_cache/
+.ruff_cache/
+
+# macOS
+.DS_Store

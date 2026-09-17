@@ -1,0 +1,26 @@
+[project]
+name = "novex"
+version = "0.0.1"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "mjol",
+    "pydantic>=2.13.4",
+    "pyfastx>=2.3",
+]
+
+[project.scripts]
+novex = "novex.cli:main"
+
+[dependency-groups]
+dev = [
+    "pytest>=9.1.1",
+]
+
+[build-system]
+requires = ["uv_build>=0.11.6,<0.12"]
+build-backend = "uv_build"
+
+[tool.uv.sources]
+mjol = { git = "https://github.com/haydenji0731/mjol.git" }
