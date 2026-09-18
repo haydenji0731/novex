@@ -64,6 +64,7 @@ name = "novex"
 version = "0.0.1"
 source = { editable = "." }
 dependencies = [
+    { name = "intervaltree" },
     { name = "mjol" },
     { name = "pydantic" },
     { name = "pyfastx" },
@@ -76,6 +77,7 @@ dev = [
 
 [package.metadata]
 requires-dist = [
+    { name = "intervaltree", specifier = ">=3.2.1" },
     { name = "mjol", git = "https://github.com/haydenji0731/mjol.git" },
     { name = "pydantic", specifier = ">=2.13.4" },
     { name = "pyfastx", specifier = ">=2.3" },
