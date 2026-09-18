@@ -90,5 +90,12 @@ def normalize(fetch: Fetch, tx: RefTranscript) -> RefTranscript:
 
 
 def normalize_all(fetch: Fetch, txs: Iterable[RefTranscript]) -> list[RefTranscript]:
-    """normalize() over all transcripts."""
+    """Run normalize() over all transcripts.
+    """
     return [normalize(fetch, tx) for tx in txs]
+
+
+def drop_partial(txs: Iterable[RefTranscript]) -> list[RefTranscript]:
+    """Discard reference transcripts whose stop codon was found.
+    """
+    return [tx for tx in txs if tx.stop != StopConvention.MISSING]

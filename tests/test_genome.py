@@ -6,13 +6,18 @@ from novex.chains import Chain, GInterval, Strand
 from novex.genome import (
     CANONICAL_MOTIFS,
     fetch_chain_seq,
-    filter_by_motif,
-    junction_dinucs,
+    filter_juncs_by_motif,
+    get_junc_dinucs,
     motif_ok,
     parse_motifs,
+    parse_starts,
+    first_codon,
+    start_ok,
+    filter_upstream_by_start,
     load_genome,
 )
 from novex.junctions import Junction
+from novex.transcripts import UpstreamChain
 
 COMPLEMENT = str.maketrans("ACGT", "TGCA")
 
@@ -72,22 +77,22 @@ def test_fetch_chain_seq_matches_stop_codons_fetch_signature(fa):
     assert fetch("chr1", Chain([(1, 4)]), Strand.PLUS) == "ACGT"
 
 
-# --- junction_dinucs ---------------------------------------------------------
+# --- get_junc_dinucs ---------------------------------------------------------
 
-def test_junction_dinucs_plus(fa):
-    assert junction_dinucs(fa, jn(11, 20)) == ("GT", "AG")
+def test_get_junc_dinucs_plus(fa):
+    assert get_junc_dinucs(fa, jn(11, 20)) == ("GT", "AG")
 
 
-def test_junction_dinucs_minus_reads_the_other_end(fa):
+def test_get_junc_dinucs_minus_reads_the_other_end(fa):
     # on '-', the donor side is the intron's genomic end; revcomp of "AG" is "CT"
-    assert junction_dinucs(fa, jn(11, 20, Strand.MINUS)) == ("CT", "AC")
+    assert get_junc_dinucs(fa, jn(11, 20, Strand.MINUS)) == ("CT", "AC")
 
 
-def test_junction_dinucs_gc_ag(fa):
-    assert junction_dinucs(fa, jn(31, 40)) == ("GC", "AG")
+def test_get_junc_dinucs_gc_ag(fa):
+    assert get_junc_dinucs(fa, jn(31, 40)) == ("GC", "AG")
 
 
-# --- motif_ok / filter_by_motif ----------------------------------------------
+# --- motif_ok / filter_juncs_by_motif ----------------------------------------------
 
 def test_motif_ok_accepts_gt_ag_and_gc_ag(fa):
     assert motif_ok(fa, jn(11, 20), CANONICAL_MOTIFS)
@@ -103,9 +108,9 @@ def test_motif_ok_honors_a_custom_allowed_set(fa):
     assert not motif_ok(fa, jn(31, 40), allowed=frozenset({("GT", "AG")}))
 
 
-def test_filter_by_motif_keeps_only_canonical(fa):
+def test_filter_juncs_by_motif_keeps_only_canonical(fa):
     juncs = [jn(11, 20), jn(21, 30), jn(31, 40)]
-    assert [j.intron.start for j in filter_by_motif(fa, juncs)] == [11, 31]
+    assert [j.intron.start for j in filter_juncs_by_motif(fa, juncs)] == [11, 31]
 
 
 def test_canonical_motifs_contents():
@@ -157,5 +162,51 @@ def test_parse_motifs_rejects_bad_input(spec):
 
 def test_motifs_any_skips_screening(fa):
     juncs = [jn(11, 20), jn(21, 30), jn(31, 40)]
-    assert filter_by_motif(fa, juncs, allowed=None) == juncs
+    assert filter_juncs_by_motif(fa, juncs, allowed=None) == juncs
     assert motif_ok(fa, jn(21, 30), allowed=None)
+
+
+# --- start codon screening ----------------------------------------------------
+
+def up(cds, strand=Strand.PLUS, uid="u1"):
+    return UpstreamChain(id=uid, chrom="chr1", strand=strand, cds=Chain(cds))
+
+
+@pytest.mark.parametrize(
+    "spec, expected",
+    [
+        ("atg", frozenset({"ATG"})),
+        ("ATG", frozenset({"ATG"})),
+        ("any", None),
+        ("near-cognate", frozenset({"ATG", "CTG", "GTG", "TTG", "ACG"})),
+        ("atg,ctg", frozenset({"ATG", "CTG"})),
+    ],
+)
+def test_parse_starts(spec, expected):
+    assert parse_starts(spec) == expected
+
+
+@pytest.mark.parametrize("spec", ["AT", "ATGG", "AXG", "nonsense"])
+def test_parse_starts_rejects_bad_input(spec):
+    with pytest.raises(ValueError):
+        parse_starts(spec)
+
+
+def test_first_codon_reads_in_transcript_direction(fa):
+    # CONTIG starts ACGTACGTAC...; on '-' the first codon of (1,3) is revcomp("ACG")
+    assert first_codon(fa, "chr1", Chain([(1, 3)]), Strand.PLUS) == "ACG"
+    assert first_codon(fa, "chr1", Chain([(1, 3)]), Strand.MINUS) == "CGT"
+
+
+def test_start_ok(fa):
+    # bases 31-33 are "GCC"; 11-13 are "GTA"
+    assert start_ok(fa, up([(31, 33)]), frozenset({"GCC"}))
+    assert not start_ok(fa, up([(31, 33)]), frozenset({"ATG"}))
+    assert start_ok(fa, up([(31, 33)]), None)  # --starts any
+
+
+def test_filter_upstream_by_start_counts(fa):
+    chains = [up([(31, 33)], uid="keep"), up([(11, 13)], uid="drop")]
+    kept = filter_upstream_by_start(fa, chains, frozenset({"GCC"}))
+    assert [u.id for u in kept] == ["keep"]
+    assert filter_upstream_by_start(fa, chains, None) == chains
