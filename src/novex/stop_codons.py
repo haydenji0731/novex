@@ -1,29 +1,12 @@
-"""Detect whether a reference CDS includes its stop codon, and normalize so it does.
-
-Annotations disagree: GENCODE/Ensembl GTF excludes the stop codon from CDS rows
-and lists it as a separate stop_codon feature, while many GFF3 and RefSeq files
-include it. novex decides per transcript, from the sequence, so mixed files work.
-
-Downstream code can then assume one convention: every RefTranscript's cds chain
-ENDS WITH its stop codon.
-
-COORDINATES: all positions here are 1-based inclusive. The extension past the CDS
-walks the EXON chain, not the genome -- a stop codon can span an intron, which is
-what the old uORFconnector's `cds.end + 3` got wrong.
-
-Sequence access goes through a `fetch` callable rather than a FASTA handle, so
-these functions stay testable without a genome file. genome.fetch_chain matches
-the signature; bind the FASTA with functools.partial.
+"""Detect whether a reference CDS includes its stop codon, and normalize when it does not.
 """
 
 from collections.abc import Callable, Iterable
 
 from novex.chains import Chain, GInterval, Strand
 from novex.transcripts import RefTranscript, StopConvention
+from novex.codons import STOP_CODONS
 
-STOP_CODONS = frozenset({"TAA", "TAG", "TGA"})
-
-# (chrom, chain, strand) -> the chain's sequence, 5'->3', reverse-complemented on '-'
 Fetch = Callable[[str, Chain, Strand], str]
 
 
@@ -37,13 +20,7 @@ def last_codon(fetch: Fetch, tx: RefTranscript) -> str:
 
 
 def extend_cds(tx: RefTranscript, n: int = 3) -> Chain | None:
-    """tx.cds grown by 3 more transcript bases, following tx.exons.
-
-    Returns None if the exon chain runs out before 3 bases are available (the
-    annotation ends at or right after the CDS).
-
-    Walks the EXON chain, so a stop codon crossing an intron lands on the right
-    bases and the result gains a new interval.
+    """tx.cds grown by n (default: 3) more transcript bases, following tx.exons.
     """
     cds_end = tx.cds.tx_to_genomic(tx.strand, len(tx.cds) - 1)   # last coding base, 5'->3'
     offset = tx.exons.genomic_to_tx(tx.strand, cds_end)

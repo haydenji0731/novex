@@ -35,36 +35,29 @@ class Junction(BaseModel, frozen=True):
         return v
 
     @property
-    def _sign(self) -> int:
-        match self.strand:
-            case Strand.PLUS: return 1
-            case Strand.MINUS: return -1
-            case _: raise ValueError("unknown strand")
-
-    @property
     def donor(self) -> int:
         """First intronic base.
         """
-        return self.intron.start if self._sign > 0 else self.intron.end
+        return self.intron.start if self.strand.sign > 0 else self.intron.end
 
     @property
     def acceptor(self) -> int:
         """Last intronic base.
         """
-        return self.intron.end if self._sign > 0 else self.intron.start
+        return self.intron.end if self.strand.sign > 0 else self.intron.start
 
     @property
     def donor_exon_base(self) -> int:
         """Exonic base upstream of donor.
         """
-        return self.donor - self._sign
+        return self.donor - self.strand.sign
         
 
     @property
     def acceptor_exon_base(self) -> int:
         """Exonic base downstream of acceptor.
         """
-        return self.acceptor + self._sign
+        return self.acceptor + self.strand.sign
 
 
 def read_bed(path: str | Path) -> Iterator[Junction]:

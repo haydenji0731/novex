@@ -20,6 +20,14 @@ class Strand(StrEnum):
     MINUS = "-"
     UNKNOWN = "."
 
+    @property
+    def sign(self) -> int:
+        """+1 when transcription runs left to right, -1 when it runs right to left."""
+        match self:
+            case Strand.PLUS: return 1
+            case Strand.MINUS: return -1
+            case _: raise ValueError(f"unknown strand: {self!r}")
+
 class Chain(BaseModel, frozen=True):
     intervals: tuple[GInterval, ...]
 
@@ -87,30 +95,31 @@ class Chain(BaseModel, frozen=True):
     def genomic_to_tx(self, strand: Strand, pos: int) -> int:
         """0-based offset of genomic `pos` from the 5' end of the chain, reading in `strand` direction.
         """
-        if strand == Strand.UNKNOWN:
-            raise ValueError("unknown strand")
-        
+        sign = strand.sign
+
         i = self._find(pos)
         if i is None:
             raise ValueError(f"{pos} is not in chain {self.intervals}")
 
-        if strand == Strand.PLUS:
-            return sum(x.length for x in self.intervals[:i]) + (pos - self.intervals[i].start)
-        elif strand == Strand.MINUS:
-            return sum(x.length for x in self.intervals[i+1:]) + (self.intervals[i].end - pos)
+        x = self.intervals[i]
+
+        passed = self.intervals[:i] if sign > 0 else self.intervals[i + 1:]
+        within = sign * (pos - (x.start if sign > 0 else x.end))
+
+        return sum(y.length for y in passed) + within
 
     def tx_to_genomic(self, strand: Strand, offset: int) -> int:
         """0-based offset of transcript `pos` from the 5' end of the chain, reading in `strand` direction.
         """
-        if strand == Strand.UNKNOWN:
-            raise ValueError("unknown strand")
+        sign = strand.sign
+        
         if offset < 0:
             raise IndexError(f"negative offset: {offset}")
 
         ctr = offset
         for x in self._tx_order(strand):
             if ctr < x.length:
-                return x.start + ctr if strand == Strand.PLUS else x.end - ctr
+                return (x.start if sign > 0 else x.end) + sign * ctr
             ctr -= x.length
 
         raise IndexError(f"offset {offset} is past the end of a {len(self)} bp chain")
