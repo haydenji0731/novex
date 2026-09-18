@@ -125,6 +125,17 @@ class Chain(BaseModel, frozen=True):
         raise IndexError(f"offset {offset} is past the end of a {len(self)} bp chain")
 
 
+def merge(intervals: Iterable[GInterval]) -> Chain:
+    """Sort intervals and join the ones that touch or overlap."""
+    merged: list[GInterval] = []
+    for x in sorted(intervals):
+        if merged and x.start <= merged[-1].end + 1:
+            merged[-1] = GInterval(merged[-1].start, max(merged[-1].end, x.end))
+        else:
+            merged.append(x)
+    return Chain(merged)
+
+
 def splice(left: Chain, right: Chain, intron: GInterval) -> Chain | None:
     """Join two chains using an intron.
     """

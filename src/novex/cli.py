@@ -15,6 +15,11 @@ from novex.genome import (
 from novex.junctions import JunctionIndex, read_bed
 from novex.stop_codons import drop_partial, normalize_all
 from novex.transcripts import CdsIndex, read_references, read_upstream
+from novex.writer import write_gtf, write_rejections
+
+
+GTF_NAME = "constructs.gtf"
+REJECTIONS_NAME = "rejections.tsv"
 
 
 def log(msg: str) -> None:
@@ -83,7 +88,13 @@ def main() -> None:
         if n:
             log(f"  rejected, {reason}: {n}")
 
-    raise NotImplementedError("output writing is not implemented yet")
+    gtf_path = args.out_dir / GTF_NAME
+    write_gtf(gtf_path, constructs)
+    write_rejections(args.out_dir / REJECTIONS_NAME, rejections)
+    log(f"wrote {gtf_path} and {args.out_dir / REJECTIONS_NAME}")
+    log(f"FASTA: gffread -w {args.out_dir / 'constructs.nt.fa'} -g {args.genome} {gtf_path}")
+    log(f"       gffread -S -y {args.out_dir / 'constructs.pt.fa'} -g {args.genome} {gtf_path}")
+
 
 
 if __name__ == "__main__":

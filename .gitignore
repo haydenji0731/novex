@@ -1,6 +1,8 @@
 # misc
 uORF_explorer/
 data/
+todos.md
+out*/
 
 # python
 __pycache__/

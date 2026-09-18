@@ -6,7 +6,7 @@ from enum import StrEnum
 
 from pydantic import BaseModel
 
-from novex.chains import Chain, Strand, splice
+from novex.chains import Chain, Strand, merge, splice
 from novex.codons import STOP_CODONS, translate
 from novex.junctions import Junction, JunctionIndex
 from novex.stop_codons import Fetch
@@ -32,6 +32,7 @@ class Construct(BaseModel, frozen=True):
     reference: RefTranscript
     junction: Junction
     cds: Chain
+    exons: Chain   # cds plus annotated UTRs; what GTF exon rows are written from
 
     @property
     def chrom(self) -> str:
@@ -74,6 +75,48 @@ def build_cds(upstream: UpstreamChain, reference: RefTranscript, junction: Junct
         return splice(upstream.cds, reference.cds, junction.intron)
     return splice(reference.cds, upstream.cds, junction.intron)
 
+
+def build_exons(upstream: UpstreamChain, reference: RefTranscript, junction: Junction) -> Chain | None:
+    """Build exon chain for a construct
+    """
+    if reference.strand.sign > 0:
+        return splice(upstream.cds, reference.exons, junction.intron)
+    return splice(reference.exons, upstream.cds, junction.intron)
+
+
+def add_utr5(exons: Chain, cds: Chain, reference: RefTranscript) -> Chain:
+    """Prepend the reference's 5' UTR.
+    """
+    strand = reference.strand
+    first_coding = cds.tx_to_genomic(strand, 0)
+    if first_coding not in reference.exons:
+        return exons # no 5' utr added
+
+    # TODO: add an example for illustration later
+    offset = reference.exons.genomic_to_tx(strand, first_coding)
+    if offset == 0:
+        return exons # no 5' utr added
+    
+    boundary = reference.exons.tx_to_genomic(strand, offset - 1)
+
+    utr5 = (
+        reference.exons.clip_end(boundary) if strand.sign > 0
+        else reference.exons.clip_start(boundary)
+    )
+
+    return merge(list(utr5.intervals) + list(exons.intervals))
+
+
+def build_chains(
+    upstream: UpstreamChain, reference: RefTranscript, junction: Junction
+) -> tuple[Chain, Chain] | None:
+    """(cds, exons) for one construct, or None if the junction does not apply."""
+    cds = build_cds(upstream, reference, junction)
+    exons = build_exons(upstream, reference, junction)
+    if cds is None or exons is None:
+        return None
+    return cds, add_utr5(exons, cds, reference)
+
 def build_all(
     fetch: Fetch,
     upstreams: Iterable[UpstreamChain],
@@ -96,12 +139,13 @@ def build_all(
         for j in junctions.donors_in(u.chrom, u.strand, u.cds):
             for r in references.containing(j.chrom, j.strand, j.acceptor_exon_base):
 
-                cds = build_cds(u, r, j)
-                if cds is None:
+                chains = build_chains(u, r, j)
+                if chains is None:
                     # technically unreachable; donors_in() and containing() guarantee 
                     raise AssertionError(
                         f"splice failed for {u.id} + {r.id} across {j.chrom}:{j.intron}"
                     )
+                cds, exons = chains
 
                 if (r.chrom, r.strand, cds) in seen_chains:
                     reject(u.id, r.id, j, RejectReason.DUPLICATE)
@@ -118,7 +162,7 @@ def build_all(
                 constructs.append(
                     Construct(
                         id=construct_id, upstream_id=u.id,
-                        reference=r, junction=j, cds=cds
+                        reference=r, junction=j, cds=cds, exons=exons
                     )
                 )
                 seen_chains[(r.chrom, r.strand, cds)] = construct_id

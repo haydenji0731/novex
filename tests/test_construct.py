@@ -1,7 +1,7 @@
 import pytest
 
 from novex.chains import Chain, GInterval, Strand
-from novex.construct import RejectReason, build_all, build_cds, check_orf
+from novex.construct import RejectReason, build_all, build_cds, build_chains, check_orf
 from novex.junctions import Junction, JunctionIndex
 from novex.transcripts import CdsIndex, RefTranscript, UpstreamChain
 
@@ -195,3 +195,74 @@ def test_build_all_ids_are_sequential_over_kept_constructs():
     # u2 produces the same chain as u1, so it is a duplicate
     assert [c.id for c in constructs] == ["cst_0"]
     assert [r.reason for r in rejections] == [RejectReason.DUPLICATE]
+
+
+# --- UTRs ---------------------------------------------------------------------
+
+def reference_with_utrs(cds, exons, strand=Strand.PLUS, tid="t1"):
+    return RefTranscript(id=tid, chrom="chr1", strand=strand, exons=Chain(exons), cds=Chain(cds))
+
+
+def test_build_chains_carries_the_reference_3prime_utr():
+    u = upstream([(11, 19)])
+    r = reference_with_utrs(cds=[(40, 51)], exons=[(40, 60)])
+    cds, exons = build_chains(u, r, junction(20, 39))
+    assert cds == Chain([(11, 19), (40, 51)])
+    assert exons == Chain([(11, 19), (40, 60)])   # 52-60 is the 3' UTR
+
+
+def test_build_chains_carries_the_reference_5prime_utr():
+    # the ORF sits inside the reference's own 5' UTR, so 1-10 comes across
+    u = upstream([(11, 19)])
+    r = reference_with_utrs(cds=[(40, 51)], exons=[(1, 60)])
+    cds, exons = build_chains(u, r, junction(20, 39))
+    assert cds == Chain([(11, 19), (40, 51)])
+    assert exons == Chain([(1, 19), (40, 60)])    # utr5 merged with the ORF's first exon
+
+
+def test_build_chains_keeps_a_spliced_5prime_utr_separate():
+    u = upstream([(11, 19)])
+    r = reference_with_utrs(cds=[(40, 51)], exons=[(1, 5), (11, 60)])
+    _, exons = build_chains(u, r, junction(20, 39))
+    assert exons == Chain([(1, 5), (11, 19), (40, 60)])
+
+
+def test_build_chains_omits_the_5prime_utr_when_the_reference_starts_downstream():
+    u = upstream([(11, 19)])
+    r = reference_with_utrs(cds=[(40, 51)], exons=[(30, 60)])   # does not reach base 10
+    _, exons = build_chains(u, r, junction(20, 39))
+    assert exons == Chain([(11, 19), (40, 60)])
+
+
+def test_build_chains_omits_the_5prime_utr_when_the_orf_is_intronic():
+    u = upstream([(11, 19)])
+    r = reference_with_utrs(cds=[(40, 51)], exons=[(1, 5), (30, 60)])  # base 10 is intronic
+    _, exons = build_chains(u, r, junction(20, 39))
+    assert exons == Chain([(11, 19), (40, 60)])
+
+
+def test_build_chains_minus_strand_utrs():
+    # transcription runs 120 -> 50; 5' UTR is genomically above the ORF
+    u = upstream([(100, 108)], strand=Strand.MINUS)
+    r = reference_with_utrs(cds=[(60, 71)], exons=[(50, 120)], strand=Strand.MINUS)
+    cds, exons = build_chains(u, r, junction(72, 99, Strand.MINUS))
+    assert cds == Chain([(60, 71), (100, 108)])
+    assert exons == Chain([(50, 71), (100, 120)])  # 50-59 is 3' UTR, 109-120 is 5' UTR
+
+
+def test_build_all_stores_the_exon_chain():
+    g = FakeGenome().put(range(11, 20), "ATGAAAAAA").put(range(40, 52), "GCCGCCGCCTAA")
+    r = reference_with_utrs(cds=[(40, 51)], exons=[(1, 60)])
+    constructs, _ = build_all(
+        g.fetch, [upstream([(11, 19)])], JunctionIndex([junction(20, 39)]), CdsIndex([r])
+    )
+    (c,) = constructs
+    assert c.cds == Chain([(11, 19), (40, 51)])
+    assert c.exons == Chain([(1, 19), (40, 60)])
+
+
+def test_build_chains_omits_the_5prime_utr_when_the_orf_starts_at_the_reference_tss():
+    u = upstream([(11, 19)])
+    r = reference_with_utrs(cds=[(40, 51)], exons=[(11, 60)])   # transcript starts at the ORF
+    _, exons = build_chains(u, r, junction(20, 39))
+    assert exons == Chain([(11, 19), (40, 60)])

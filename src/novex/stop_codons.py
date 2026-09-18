@@ -3,7 +3,7 @@
 
 from collections.abc import Callable, Iterable
 
-from novex.chains import Chain, GInterval, Strand
+from novex.chains import Chain, GInterval, Strand, merge
 from novex.transcripts import RefTranscript, StopConvention
 from novex.codons import STOP_CODONS
 
@@ -33,18 +33,7 @@ def extend_cds(tx: RefTranscript, n: int = 3) -> Chain | None:
             return None
         extra.append(GInterval(pos, pos))
 
-    return _merge(list(tx.cds.intervals) + extra)
-
-
-def _merge(intervals: list[GInterval]) -> Chain:
-    """Sort intervals and join the ones that touch or overlap."""
-    merged: list[GInterval] = []
-    for x in sorted(intervals):
-        if merged and x.start <= merged[-1].end + 1:
-            merged[-1] = GInterval(merged[-1].start, max(merged[-1].end, x.end))
-        else:
-            merged.append(x)
-    return Chain(merged)
+    return merge(list(tx.cds.intervals) + extra)
 
 
 def detect_stop_convention(fetch: Fetch, tx: RefTranscript) -> StopConvention:
