@@ -47,14 +47,10 @@ class RefTranscript(BaseModel, frozen=True):
     gene_id: str | None = None
     stop: StopConvention = StopConvention.UNDETECTED
 
-    def with_cds(self, cds: Chain, stop: StopConvention) -> "RefTranscript":
+    def copy_with_cds(self, cds: Chain, stop: StopConvention) -> "RefTranscript":
         """Copy with a normalized CDS chain and the detected convention.
-
-        Used by stops.py, since this model is frozen. model_copy(update=...) does
-        the work.
         """
-        
-        raise NotImplementedError
+        return self.model_copy(update={"cds": cds, "stop": stop})
 
 
 @dataclass
