@@ -17,7 +17,7 @@ from novex.genome import (
     load_genome,
 )
 from novex.junctions import Junction
-from novex.transcripts import UpstreamChain
+from novex.transcripts import OrfChain
 
 COMPLEMENT = str.maketrans("ACGT", "TGCA")
 
@@ -169,7 +169,7 @@ def test_motifs_any_skips_screening(fa):
 # --- start codon screening ----------------------------------------------------
 
 def up(cds, strand=Strand.PLUS, uid="u1"):
-    return UpstreamChain(id=uid, chrom="chr1", strand=strand, cds=Chain(cds))
+    return OrfChain(id=uid, chrom="chr1", strand=strand, cds=Chain(cds))
 
 
 @pytest.mark.parametrize(

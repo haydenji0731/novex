@@ -136,6 +136,13 @@ def merge(intervals: Iterable[GInterval]) -> Chain:
     return Chain(merged)
 
 
+def head(chain: Chain, strand: Strand, n: int) -> Chain:
+    """The first `n` bases of `chain`, reading 5'->3'.
+    """
+    pos = chain.tx_to_genomic(strand, n - 1)
+    return chain.clip_end(pos) if strand.sign > 0 else chain.clip_start(pos)
+
+
 def splice(left: Chain, right: Chain, intron: GInterval) -> Chain | None:
     """Join two chains using an intron.
     """

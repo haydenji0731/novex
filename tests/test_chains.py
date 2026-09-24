@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from novex.chains import Chain, GInterval, Strand, splice
+from novex.chains import head, Chain, GInterval, Strand, splice
 
 TWO = Chain([(10, 19), (30, 39)])
 THREE = Chain([(10, 19), (30, 39), (50, 59)])
@@ -184,3 +184,49 @@ def test_unknown_strand_rejected():
         TWO.genomic_to_tx(Strand.UNKNOWN, 10)
     with pytest.raises(ValueError):
         TWO.tx_to_genomic(Strand.UNKNOWN, 0)
+
+
+# --- head --------------------------------------------------------------------
+
+TWO_UNEVEN = Chain([(11, 19), (40, 51)])   # 9 + 12 = 21 bases
+
+
+@pytest.mark.parametrize(
+    "n, expected",
+    [
+        (1, [(11, 11)]),                 # first base only
+        (9, [(11, 19)]),                 # exactly the first interval
+        (10, [(11, 19), (40, 40)]),      # one base into the second
+        (12, [(11, 19), (40, 42)]),      # mid-second-interval
+        (21, [(11, 19), (40, 51)]),      # the whole chain
+    ],
+)
+def test_head_plus(n, expected):
+    assert head(TWO_UNEVEN, Strand.PLUS, n) == Chain(expected)
+
+
+@pytest.mark.parametrize(
+    "n, expected",
+    [
+        (1, [(51, 51)]),                 # transcript starts at the highest base
+        (12, [(40, 51)]),                # exactly the (genomically second) interval
+        (13, [(19, 19), (40, 51)]),      # one base into the next one, leftwards
+        (21, [(11, 19), (40, 51)]),      # the whole chain
+    ],
+)
+def test_head_minus(n, expected):
+    assert head(TWO_UNEVEN, Strand.MINUS, n) == Chain(expected)
+
+
+@pytest.mark.parametrize("strand", [Strand.PLUS, Strand.MINUS])
+def test_head_rejects_out_of_range(strand):
+    with pytest.raises(IndexError):
+        head(TWO_UNEVEN, strand, len(TWO_UNEVEN) + 1)
+    with pytest.raises(IndexError):
+        head(TWO_UNEVEN, strand, 0)
+
+
+def test_head_does_not_modify_input():
+    before = TWO_UNEVEN.intervals
+    head(TWO_UNEVEN, Strand.PLUS, 12)
+    assert TWO_UNEVEN.intervals == before

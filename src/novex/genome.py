@@ -8,7 +8,7 @@ import pyfastx
 from novex.chains import Chain, Strand
 from novex.codons import START_CODON
 from novex.junctions import Junction
-from novex.transcripts import UpstreamChain
+from novex.transcripts import OrfChain, RefTranscript
 
 Motifs = frozenset[tuple[str, str]]
 Starts = frozenset[str]
@@ -124,20 +124,32 @@ def first_codon(fa: pyfastx.Fasta, chrom: str, chain: Chain, strand: Strand) -> 
     return fetch_chain_seq(fa, chrom, chain, strand)[:3]
 
 
-def start_ok(fa: pyfastx.Fasta, upstream: UpstreamChain, allowed: Starts | None) -> bool:
-    """Whether the upstream chain begins with an allowed start codon.
+def start_ok(fa: pyfastx.Fasta, feature: OrfChain | RefTranscript, allowed: Starts | None) -> bool:
+    """Whether the feature's chain begins with an allowed start codon.
     """
     if allowed is None:
         return True
-    return first_codon(fa, upstream.chrom, upstream.cds, upstream.strand) in allowed
+    return first_codon(fa, feature.chrom, feature.cds, feature.strand) in allowed
 
 
+# UPSTREAM ONLY (cli -d u)
 def filter_upstream_by_start(
     fa: pyfastx.Fasta,
-    upstreams: Iterable[UpstreamChain],
-    allowed: Starts | None,
-) -> list[UpstreamChain]:
+    upstreams: Iterable[OrfChain],
+    allowed: Starts | None
+) -> list[OrfChain]:
     """Keep only upstream chains starting with an allowed codon."""
     if allowed is None:
         return list(upstreams)
     return [u for u in upstreams if start_ok(fa, u, allowed)]
+
+# DOWNSTREAM ONLY (cli -d d)
+def filter_reference_by_start(
+    fa: pyfastx.Fasta,
+    references: Iterable[RefTranscript],
+    allowed: Starts | None
+) -> list[RefTranscript]:
+    """Keep only reference transcripts starting with an allowed codon."""
+    if allowed is None:
+        return list(references)
+    return [r for r in references if start_ok(fa, r, allowed)]

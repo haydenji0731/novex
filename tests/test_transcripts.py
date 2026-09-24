@@ -5,9 +5,9 @@ from novex.transcripts import (
     CdsIndex,
     RefTranscript,
     StopConvention,
-    UpstreamChain,
+    OrfChain,
     read_references,
-    read_upstream,
+    read_queries,
 )
 
 
@@ -32,23 +32,23 @@ def ref(tid, cds, chrom="chr1", strand=Strand.PLUS, exons=None):
     )
 
 
-# --- read_upstream -----------------------------------------------------------
+# --- read_queries -----------------------------------------------------------
 
-def test_read_upstream_builds_chain_from_cds_rows(tmp_path):
+def test_read_queries_builds_chain_from_cds_rows(tmp_path):
     p = write(
         tmp_path,
         gtf_row("transcript", 100, 300, "u1"),
         gtf_row("CDS", 100, 150, "u1"),
         gtf_row("CDS", 251, 300, "u1"),
     )
-    (u,) = read_upstream(p)
+    (u,) = read_queries(p)
     assert u.id == "u1"
     assert u.chrom == "chr1"
     assert u.strand == Strand.PLUS
     assert u.cds == Chain([(100, 150), (251, 300)])
 
 
-def test_read_upstream_ignores_exon_and_other_rows(tmp_path):
+def test_read_queries_ignores_exon_and_other_rows(tmp_path):
     p = write(
         tmp_path,
         "# a comment\n",
@@ -56,40 +56,40 @@ def test_read_upstream_ignores_exon_and_other_rows(tmp_path):
         gtf_row("CDS", 100, 150, "u1"),
         gtf_row("start_codon", 100, 102, "u1"),
     )
-    (u,) = read_upstream(p)
+    (u,) = read_queries(p)
     assert u.cds == Chain([(100, 150)])
 
 
-def test_read_upstream_sorts_rows_by_position(tmp_path):
+def test_read_queries_sorts_rows_by_position(tmp_path):
     p = write(
         tmp_path,
         gtf_row("CDS", 251, 300, "u1"),
         gtf_row("CDS", 100, 150, "u1"),
     )
-    (u,) = read_upstream(p)
+    (u,) = read_queries(p)
     assert u.cds == Chain([(100, 150), (251, 300)])
 
 
-def test_read_upstream_separates_transcripts(tmp_path):
+def test_read_queries_separates_transcripts(tmp_path):
     p = write(
         tmp_path,
         gtf_row("CDS", 100, 150, "u1"),
         gtf_row("CDS", 100, 150, "u2", chrom="chr2", strand="-"),
     )
-    by_id = {u.id: u for u in read_upstream(p)}
+    by_id = {u.id: u for u in read_queries(p)}
     assert set(by_id) == {"u1", "u2"}
     assert by_id["u2"].chrom == "chr2"
     assert by_id["u2"].strand == Strand.MINUS
 
 
-def test_read_upstream_rejects_inconsistent_rows(tmp_path):
+def test_read_queries_rejects_inconsistent_rows(tmp_path):
     p = write(
         tmp_path,
         gtf_row("CDS", 100, 150, "u1"),
         gtf_row("CDS", 200, 250, "u1", strand="-"),
     )
     with pytest.raises(ValueError):
-        read_upstream(p)
+        read_queries(p)
 
 
 # --- read_references ---------------------------------------------------------

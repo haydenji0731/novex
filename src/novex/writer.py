@@ -10,7 +10,7 @@ from novex.construct import Construct, Rejection
 SOURCE = "novex"
 
 REJECTION_HEADER = (
-    "upstream_id",
+    "query_id",
     "reference_id",
     "chrom",
     "strand",
@@ -28,7 +28,7 @@ def construct_attributes(construct: Construct) -> dict[str, str]:
     return {
         "transcript_id": construct.id,
         "gene_id": construct.reference.gene_id or construct.reference.id,
-        "upstream_id": construct.upstream_id,
+        "query_id": construct.query_id,
         "reference_id": construct.reference.id,
         "junction": f"{j.chrom}:{j.intron.start}-{j.intron.end}",
     }
@@ -108,7 +108,7 @@ def write_rejections(path: Path, rejections: Iterable[Rejection]) -> int:
             fh.write(
                 "\t".join(
                     (
-                        r.upstream_id,
+                        r.query_id,
                         r.reference_id,
                         r.junction.chrom,
                         str(r.junction.strand),

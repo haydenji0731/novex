@@ -146,3 +146,50 @@ def test_index_is_empty_when_built_from_nothing():
     idx = JunctionIndex([])
     assert len(idx) == 0
     assert idx.donors_in("chr1", Strand.PLUS, CHAIN) == []
+
+
+# --- acceptors_in -------------------------------------------------------------
+
+# acceptor_exon_base on '+' is intron.end + 1; on '-' it is intron.start - 1
+def acceptor_inside():
+    """introns whose acceptor exon base lands at 10, 19 and 30"""
+    return [jn(5, 9), jn(5, 18), jn(5, 29)]
+
+
+def acceptor_outside():
+    return [
+        jn(1, 4),                    # 5: before the chain
+        jn(5, 24),                   # 25: in the chain's gap
+        jn(5, 44),                   # 45: past the chain
+        jn(5, 9, Strand.MINUS),      # right position on the wrong strand
+        jn(5, 9, chrom="chr2"),      # right position on the wrong contig
+    ]
+
+
+def test_index_finds_only_acceptors_inside_the_chain():
+    idx = JunctionIndex(acceptor_inside() + acceptor_outside())
+    found = idx.acceptors_in("chr1", Strand.PLUS, CHAIN)
+    assert [j.acceptor_exon_base for j in found] == [10, 19, 30]
+
+
+def test_acceptors_and_donors_are_indexed_independently():
+    # one junction: donor exon base 15, acceptor exon base 61
+    j = jn(16, 60)
+    idx = JunctionIndex([j])
+    assert idx.donors_in("chr1", Strand.PLUS, CHAIN) == [j]
+    assert idx.acceptors_in("chr1", Strand.PLUS, CHAIN) == []
+    assert idx.acceptors_in("chr1", Strand.PLUS, Chain([(55, 70)])) == [j]
+
+
+def test_acceptors_in_minus_strand_uses_the_other_intron_end():
+    # on '-', acceptor_exon_base is intron.start - 1
+    chain = Chain([(300, 330)])
+    idx = JunctionIndex([jn(331, 400, Strand.MINUS), jn(340, 400, Strand.MINUS)])
+    found = idx.acceptors_in("chr1", Strand.MINUS, chain)
+    assert [j.acceptor_exon_base for j in found] == [330]
+
+
+def test_acceptors_in_returns_empty_for_unknown_key():
+    idx = JunctionIndex(acceptor_inside())
+    assert idx.acceptors_in("chrX", Strand.PLUS, CHAIN) == []
+    assert idx.acceptors_in("chr1", Strand.MINUS, CHAIN) == []

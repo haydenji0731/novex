@@ -89,40 +89,57 @@ class _JGroup(NamedTuple):
     junctions: list[Junction]
 
 class JunctionIndex:
-    """Junctions grouped by (chrom, strand) and sorted by donor_exon_base.
+    """Junctions grouped by (chrom, strand), sorted two ways.
+
+    donors_in() serves the upstream path (cli -d up) and acceptors_in() the
+    downstream one; each bisects its own sorted copy of the same junctions.
     """
 
     def __init__(self, junctions: Iterable[Junction]):
-        """Group junctions by (chrom, strand), then sort each group by donor_exon_base.
+        """Group junctions by (chrom, strand), then sort each group both ways.
         """
         jdata: dict[tuple[str, Strand], list[Junction]] = defaultdict(list)
         for j in junctions:
             jdata[(j.chrom, j.strand)].append(j)
 
-        self._groups: dict[tuple[str, Strand], _JGroup] = {}
+        self._by_donor: dict[tuple[str, Strand], _JGroup] = {}
+        self._by_acceptor: dict[tuple[str, Strand], _JGroup] = {}
         for k, js in jdata.items():
-            js.sort(key=lambda j: j.donor_exon_base)
-            self._groups[k] = _JGroup(
-                positions = [j.donor_exon_base for j in js],
-                junctions = js
+            js_by_donor = sorted(js, key=lambda j: j.donor_exon_base)
+            self._by_donor[k] = _JGroup(
+                positions = [j.donor_exon_base for j in js_by_donor],
+                junctions = js_by_donor
+            )
+            js_by_acceptor = sorted(js, key=lambda j: j.acceptor_exon_base)
+            self._by_acceptor[k] = _JGroup(
+                positions = [j.acceptor_exon_base for j in js_by_acceptor],
+                junctions = js_by_acceptor
             )
 
     def __len__(self) -> int:
         """Total number of junctions."""
-        return sum(len(g.junctions) for g in self._groups.values())
+        return sum(len(g.junctions) for g in self._by_donor.values())
 
-    def donors_in(self, chrom: str, strand: Strand, chain: Chain) -> list[Junction]:
-        """Junctions on (chrom, strand) whose donor_exon_base falls inside `chain`.
-        """
-        g = self._groups.get((chrom, strand))
-        if g is None:
+    def _in(self, g: _JGroup | None, chain: Chain) -> list[Junction]:
+        if g is None:   # nothing indexed on this (chrom, strand)
             return []
-        out: list[Junction] = []
 
+        out: list[Junction] = []
         for x in chain.intervals:
             lo = bisect_left(g.positions, x.start)
             hi = bisect_right(g.positions, x.end)
             out.extend(g.junctions[lo:hi])
-
+        
         return out
     
+    def donors_in(self, chrom: str, strand: Strand, chain: Chain) -> list[Junction]:
+        """Junctions on (chrom, strand) whose donor_exon_base falls inside `chain`.
+        """
+        g = self._by_donor.get((chrom, strand))
+        return self._in(g, chain)
+
+    def acceptors_in(self, chrom: str, strand: Strand, chain: Chain) -> list[Junction]:
+        """Junctions on (chrom, strand) whose acceptor_exon_base falls inside `chain`.
+        """
+        g = self._by_acceptor.get((chrom, strand))
+        return self._in(g, chain)

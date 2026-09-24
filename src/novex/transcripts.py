@@ -28,8 +28,8 @@ class StopConvention(StrEnum):
     UNDETECTED = "undetected"
 
 
-class UpstreamChain(BaseModel, frozen=True):
-    """Open reading frame chain upstream of reference CDS.
+class OrfChain(BaseModel, frozen=True):
+    """Open reading frame chain upstream / downstream of reference CDS.
     """
     id: str
     chrom: str
@@ -121,16 +121,16 @@ def _group_by_tx(
     return data
 
 
-def read_upstream(
+def read_queries(
     path: str | Path,
     id_attr_key: str = "transcript_id",
     fmt: fileFmt = "gtf"
-) -> list[UpstreamChain]:
+) -> list[OrfChain]:
     """Load upstream ORFs from a GTF/GFF file.
     """
     data = _group_by_tx(path, id_attr_key, fmt, keep=("CDS",))
     return [
-        UpstreamChain(id=tx_id, chrom=acc.chrom, strand=acc.strand, cds=Chain(sorted(acc.cds)))
+        OrfChain(id=tx_id, chrom=acc.chrom, strand=acc.strand, cds=Chain(sorted(acc.cds)))
         for tx_id, acc in data.items()
     ]
 
