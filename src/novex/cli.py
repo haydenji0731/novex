@@ -59,7 +59,7 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--min-cds-ratio", type=float, default=0.0,
         help="reject constructs whose CDS is shorter than this fraction of the "
-             "reference transcript's CDS (0.0 = no filter)",
+             "reference transcript's CDS (default: 0.0)",
     )
     parser.add_argument(
         "--starts", type=parse_starts, default="atg",
