@@ -3,10 +3,12 @@ import sys
 from functools import partial
 from pathlib import Path
 
+from novex.chains import Chain, GInterval, merge
 from novex.construct import RejectReason, build_all_upstream, build_all_downstream
 from novex.genome import (
     fetch_chain_seq,
     filter_juncs_by_motif,
+    motif_ok,
     filter_upstream_by_start,
     filter_reference_by_start,
     load_genome,
@@ -59,13 +61,26 @@ def get_args() -> argparse.Namespace:
     parser.add_argument(
         "--min-cds-ratio", type=float, default=0.0,
         help="reject constructs whose CDS is shorter than this fraction of the "
-             "reference transcript's CDS (default: 0.0)",
+             "reference transcript's CDS (default: 0.0)"
     )
     parser.add_argument(
         "--starts", type=parse_starts, default="atg",
         help="atg | near-cognate | any | explicit codons, e.g. ATG,CTG",
     )
     return parser.parse_args()
+
+
+def query_regions(queries) -> dict[str, Chain]:
+    """Merged genomic spans of the queries, per contig.
+
+    Used to drop junctions that cannot be anchored in any query before they are
+    materialised -- a genome-wide BED does not fit in memory otherwise.
+    """
+    spans: dict[str, list[GInterval]] = {}
+    for q in queries:
+        ivs = q.cds.intervals
+        spans.setdefault(q.chrom, []).append(GInterval(ivs[0].start, ivs[-1].end))
+    return {chrom: merge(ivs) for chrom, ivs in spans.items()}
 
 
 def main() -> None:
@@ -84,9 +99,19 @@ def main() -> None:
         queries = prelim_queries
         log(f"queries | {len(queries)} (start codons come from the reference)")
 
-    prelim_juncs = list(read_bed(args.junctions))
-    juncs = filter_juncs_by_motif(fa, prelim_juncs, args.motifs)
-    log(f"junctions | {len(juncs)}/{len(prelim_juncs)} with an allowed splice motif")
+    # stream: only junctions anchored in a query become objects, and only those passing
+    # the motif screen are kept, so neither the whole BED nor a second copy is held
+    regions = query_regions(queries)
+    anchor = "donor" if args.direction == "up" else "acceptor"
+    anchored = 0
+    juncs = []
+    print("hello")
+    for j in read_bed(args.junctions, regions, anchor):
+        anchored += 1
+        if motif_ok(fa, j, args.motifs):
+            juncs.append(j)
+    print("hello2")
+    log(f"junctions | {len(juncs)}/{anchored} anchored in a query, with an allowed splice motif")
 
     prelim_references = read_references(args.reference, fmt=args.fmt)
 

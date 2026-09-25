@@ -31,6 +31,10 @@ def construct_attributes(construct: Construct) -> dict[str, str]:
         "query_id": construct.query_id,
         "reference_id": construct.reference.id,
         "junction": f"{j.chrom}:{j.intron.start}-{j.intron.end}",
+        "cds_len": str(len(construct.cds)),
+        "ref_cds_len": str(len(construct.reference.cds)),
+        # what --min-cds-ratio thresholds on
+        "cds_ratio": f"{len(construct.cds) / len(construct.reference.cds):.3f}",
     }
 
 
