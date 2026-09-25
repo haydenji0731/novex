@@ -31,6 +31,9 @@ def construct_attributes(construct: Construct) -> dict[str, str]:
         "query_id": construct.query_id,
         "reference_id": construct.reference.id,
         "junction": f"{j.chrom}:{j.intron.start}-{j.intron.end}",
+        # BED columns 4 and 5 of the junction, "." when the file had none
+        "junction_name": j.name or ".",
+        "junction_score": "." if j.score is None else f"{j.score:g}",
         "cds_len": str(len(construct.cds)),
         "ref_cds_len": str(len(construct.reference.cds)),
         # what --min-cds-ratio thresholds on

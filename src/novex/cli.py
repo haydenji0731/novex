@@ -131,7 +131,7 @@ def main() -> None:
     counts = {reason: 0 for reason in RejectReason}
     for r in rejections:
         counts[r.reason] += 1
-    log(f"constructs | {len(constructs)} built from {len(constructs) + len(rejections)} candidates")
+    log(f"constructs | {len(constructs)} passed from {len(constructs) + len(rejections)} candidates")
     for reason, n in counts.items():
         if n:
             log(f"  rejected, {reason}: {n}")
