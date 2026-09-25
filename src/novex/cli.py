@@ -106,7 +106,7 @@ def main() -> None:
     anchored = 0
     juncs = []
     print("hello")
-    for j in read_bed(args.junctions, regions, anchor):
+    for j in read_bed(args.junctions):
         anchored += 1
         if motif_ok(fa, j, args.motifs):
             juncs.append(j)
