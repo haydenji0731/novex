@@ -8,7 +8,7 @@ dependencies = [
     "intervaltree>=3.2.1",
     "mjol",
     "pydantic>=2.13.4",
-    "pyfastx>=2.3",
+    "pyfaidx>=0.9.0.4",
 ]
 
 [project.scripts]

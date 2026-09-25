@@ -1,9 +1,16 @@
 """Access genome sequences & check dinucleotide
+
+Sequence comes from pyfaidx, which is pure Python: pyfastx segfaulted inside its C
+extension partway through a genome-wide run (no traceback, exit 139), and a crash with
+no diagnosis is the worst failure mode for a long pipeline.
+
+COORDINATES: pyfaidx slices are 0-based half-open, so a 1-based inclusive interval
+(start, end) is read as [start - 1 : end]. That conversion lives only in fetch_chain_seq.
 """
 
 from collections.abc import Iterable
 
-import pyfastx
+from pyfaidx import Fasta
 
 from novex.chains import Chain, Strand
 from novex.codons import START_CODON
@@ -48,23 +55,30 @@ def parse_motifs(pattern: str) -> Motifs | None:
     return frozenset(motifs)
 
 
-def load_genome(path) -> pyfastx.Fasta:
-    return pyfastx.Fasta(str(path))
+COMPLEMENT = str.maketrans("ACGTN", "TGCAN")
 
 
-def fetch_chain_seq(fa: pyfastx.Fasta, chrom: str, chain: Chain, strand: Strand) -> str:
+def load_genome(path) -> Fasta:
+    """Open a FASTA, building its .fai index on first use."""
+    return Fasta(str(path), as_raw=True, sequence_always_upper=True)
+
+
+def fetch_chain_seq(fa: Fasta, chrom: str, chain: Chain, strand: Strand) -> str:
     """A chain's spliced sequence, 5'->3', upper-cased.
     """
     if strand == Strand.UNKNOWN:
         raise ValueError("unknown strand")
 
-    intervals = [(x.start, x.end) for x in chain.intervals]
+    contig = fa[chrom]
+    # 1-based inclusive -> 0-based half-open
+    seq = "".join(contig[x.start - 1 : x.end] for x in chain.intervals)
 
-    # 1-based, inclusive; different from slicing Sequence obj directly
-    return fa.fetch(chrom, intervals, strand=str(strand)).upper()
+    if strand.sign > 0:
+        return seq
+    return seq.translate(COMPLEMENT)[::-1]
 
 
-def get_junc_dinucs(fa: pyfastx.Fasta, junction: Junction) -> tuple[str, str]:
+def get_junc_dinucs(fa: Fasta, junction: Junction) -> tuple[str, str]:
     """(donor, acceptor) dinucleotides of `junction`, read 5'->3'.
     """
     step = junction.strand.sign
@@ -77,7 +91,7 @@ def get_junc_dinucs(fa: pyfastx.Fasta, junction: Junction) -> tuple[str, str]:
 
 
 def motif_ok(
-    fa: pyfastx.Fasta,
+    fa: Fasta,
     junction: Junction,
     allowed: Motifs | None,
 ) -> bool:
@@ -89,7 +103,7 @@ def motif_ok(
 
 
 def filter_juncs_by_motif(
-    fa: pyfastx.Fasta,
+    fa: Fasta,
     junctions: Iterable[Junction],
     allowed: Motifs | None = CANONICAL_MOTIFS,
 ) -> list[Junction]:
@@ -119,12 +133,12 @@ def parse_starts(pattern: str) -> Starts | None:
     return frozenset(starts)
 
 
-def first_codon(fa: pyfastx.Fasta, chrom: str, chain: Chain, strand: Strand) -> str:
+def first_codon(fa: Fasta, chrom: str, chain: Chain, strand: Strand) -> str:
     """The first 3 bases of `chain`, read 5'->3'."""
     return fetch_chain_seq(fa, chrom, chain, strand)[:3]
 
 
-def start_ok(fa: pyfastx.Fasta, feature: OrfChain | RefTranscript, allowed: Starts | None) -> bool:
+def start_ok(fa: Fasta, feature: OrfChain | RefTranscript, allowed: Starts | None) -> bool:
     """Whether the feature's chain begins with an allowed start codon.
     """
     if allowed is None:
@@ -134,7 +148,7 @@ def start_ok(fa: pyfastx.Fasta, feature: OrfChain | RefTranscript, allowed: Star
 
 # UPSTREAM ONLY (cli -d u)
 def filter_upstream_by_start(
-    fa: pyfastx.Fasta,
+    fa: Fasta,
     upstreams: Iterable[OrfChain],
     allowed: Starts | None
 ) -> list[OrfChain]:
@@ -145,7 +159,7 @@ def filter_upstream_by_start(
 
 # DOWNSTREAM ONLY (cli -d d)
 def filter_reference_by_start(
-    fa: pyfastx.Fasta,
+    fa: Fasta,
     references: Iterable[RefTranscript],
     allowed: Starts | None
 ) -> list[RefTranscript]:

@@ -67,7 +67,7 @@ dependencies = [
     { name = "intervaltree" },
     { name = "mjol" },
     { name = "pydantic" },
-    { name = "pyfastx" },
+    { name = "pyfaidx" },
 ]
 
 [package.dev-dependencies]
@@ -80,7 +80,7 @@ requires-dist = [
     { name = "intervaltree", specifier = ">=3.2.1" },
     { name = "mjol", git = "https://github.com/haydenji0731/mjol.git" },
     { name = "pydantic", specifier = ">=2.13.4" },
-    { name = "pyfastx", specifier = ">=2.3" },
+    { name = "pyfaidx", specifier = ">=0.9.0.4" },
 ]
 
 [package.metadata.requires-dev]
@@ -260,26 +260,15 @@ wheels = [
 ]
 
 [[package]]
-name = "pyfastx"
-version = "2.3.1"
+name = "pyfaidx"
+version = "0.9.0.4"
 source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/04/30/b637657b3b05c318307a74075e106eca49432f80237925c48367bcc2b471/pyfastx-2.3.1.tar.gz", hash = "sha256:19d802cc13ee7774a3068bae3e4d4f419cc69aa237f2dd6366ce220a08b03dca", size = 261246, upload-time = "2026-06-10T14:05:46.202Z" }
+dependencies = [
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/19/af/da148aaa8e75c9890a41dbe5516f8006def2b74831e66acf79f81bb7bb5b/pyfaidx-0.9.0.4.tar.gz", hash = "sha256:801bdd208b12bff6f4fb2da10a16834158dbb1c6f146e4015c9ff45e509acd65", size = 71759, upload-time = "2026-03-19T19:02:58.561Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/72/55/480a2c7c040441d2a419dba6c7cbbf87a13fa82df91e16c4441d3a39f4c9/pyfastx-2.3.1-cp313-cp313-macosx_10_13_x86_64.whl", hash = "sha256:f718a2730d89adfcc18068736d61ba713269283bc3bc56af04cbb50849033cf8", size = 784548, upload-time = "2026-06-10T14:05:10.4Z" },
-    { url = "https://files.pythonhosted.org/packages/0d/dd/91f9aac031d6f2e7c7c92abe6f81fa818de082630d0e67fd9aa220aa335e/pyfastx-2.3.1-cp313-cp313-macosx_11_0_arm64.whl", hash = "sha256:436c8e6cdd5dc1601082d5dc6d3f6031e167f566dfc2e022013e5284cab833ab", size = 743993, upload-time = "2026-06-10T14:05:11.638Z" },
-    { url = "https://files.pythonhosted.org/packages/c2/88/09f10124d29a3b1bd0c8a0362008d1344cd508b032c83c022ba130ce8a65/pyfastx-2.3.1-cp313-cp313-manylinux_2_28_x86_64.whl", hash = "sha256:d54496761f94523b92525c51743e655e0994b37629e88d472bc3f9928a5d978f", size = 876196, upload-time = "2026-06-10T14:05:13.421Z" },
-    { url = "https://files.pythonhosted.org/packages/02/ef/afa6b0f9aa234dfac2e8ba5a767e2a386a058fea4d93d3fa4674612d6ead/pyfastx-2.3.1-cp313-cp313-musllinux_1_2_x86_64.whl", hash = "sha256:af4ca61588b84a8c8f80698e754280a59592a1da8c646b597512244d072f7880", size = 882668, upload-time = "2026-06-10T14:05:14.655Z" },
-    { url = "https://files.pythonhosted.org/packages/0c/8f/abd010812c087779de9898b4d3d3efa988c689f99897669ce2301082e69a/pyfastx-2.3.1-cp313-cp313-win_amd64.whl", hash = "sha256:ce1f60b267b5270886b3749c2988bbcc736aa94dff2d09d4b063e7ac2fe32794", size = 672171, upload-time = "2026-06-10T14:05:16.216Z" },
-    { url = "https://files.pythonhosted.org/packages/10/33/cea436a8bd149e6d6befd40d02c28443e06fe188e6b8d2e277f5a4320e80/pyfastx-2.3.1-cp314-cp314-macosx_10_15_x86_64.whl", hash = "sha256:92468f619af64860fcd856763374893500755e6831e46f4c09e0056c731402f7", size = 784681, upload-time = "2026-06-10T14:05:17.495Z" },
-    { url = "https://files.pythonhosted.org/packages/1c/72/ea280bc43f1f817aca28c69e40971d7d0cb82126dba7cf732abb72ef5ff3/pyfastx-2.3.1-cp314-cp314-macosx_11_0_arm64.whl", hash = "sha256:6e40a35063673c07f3bbe0660546f8a4cb2910034a68c6ae2e2b739618f50be3", size = 744070, upload-time = "2026-06-10T14:05:19.005Z" },
-    { url = "https://files.pythonhosted.org/packages/7e/e6/dfbac08ae802bfa35247eb4fb0cc798593cda0fd0e5ad71c75d54f121115/pyfastx-2.3.1-cp314-cp314-manylinux_2_28_x86_64.whl", hash = "sha256:0bda36e305a66626c56d670f94701797836750933923a9715ba1d240fc040ed1", size = 876185, upload-time = "2026-06-10T14:05:20.189Z" },
-    { url = "https://files.pythonhosted.org/packages/e3/33/ac9e38b5961be57237b75e1a57526caa55830105ec4f4baff44d1b7c96ec/pyfastx-2.3.1-cp314-cp314-musllinux_1_2_x86_64.whl", hash = "sha256:c1669160da91a03a88f21855ff181a25e0114f130473727903f8d3d427a56fd7", size = 882672, upload-time = "2026-06-10T14:05:21.44Z" },
-    { url = "https://files.pythonhosted.org/packages/87/5a/e6c2b64b28ff23fbe7557ef1ab2f5e2503c626ce10b55ad14ac342be7048/pyfastx-2.3.1-cp314-cp314-win_amd64.whl", hash = "sha256:9abaabd2f2f24c390707280284dc2dd552f101d52c52a696455c6d2fc6e7c66b", size = 691478, upload-time = "2026-06-10T14:05:22.77Z" },
-    { url = "https://files.pythonhosted.org/packages/c2/3b/784d043b09d37a17e6a0dee46e3b0b187fbb9937de8a546e7efbb6441b86/pyfastx-2.3.1-cp314-cp314t-macosx_10_15_x86_64.whl", hash = "sha256:ac3dbabf9ad47407fafbac6e2e842c8f583d480cf34518f103ef0ad5fba6042f", size = 785241, upload-time = "2026-06-10T14:05:24.002Z" },
-    { url = "https://files.pythonhosted.org/packages/49/c0/2d64d2f197469d2202491364a71846002b4bb10e0f19908e5130ed68d66b/pyfastx-2.3.1-cp314-cp314t-macosx_11_0_arm64.whl", hash = "sha256:377a7f2d96e0ec308cb25a73b8fe7e4539256705fa6b788f0cc12854777770d5", size = 744637, upload-time = "2026-06-10T14:05:25.298Z" },
-    { url = "https://files.pythonhosted.org/packages/cb/15/db9e6a2f6cfc23c8517cd51273f805d2a0dc188a588f7035fd82e4948975/pyfastx-2.3.1-cp314-cp314t-manylinux_2_28_x86_64.whl", hash = "sha256:6ffeb1693f4f1ae7283e6527ced49c5a3e1df60ebec4bb145a2c9fb954b5ea28", size = 877068, upload-time = "2026-06-10T14:05:27.063Z" },
-    { url = "https://files.pythonhosted.org/packages/31/9a/a70f4dabbe55e439568312006ad83d84cc2f219b0e47078a18f398cfb500/pyfastx-2.3.1-cp314-cp314t-musllinux_1_2_x86_64.whl", hash = "sha256:b6f8ada3867250d4e48f54bd67653ef8b097ca18bbf07176a2b94896515149bb", size = 883283, upload-time = "2026-06-10T14:05:28.711Z" },
-    { url = "https://files.pythonhosted.org/packages/c0/dc/a8d9ff29b92f60242f2a05280f9bc7e9445394a9a74fced768c4e1f492bb/pyfastx-2.3.1-cp314-cp314t-win_amd64.whl", hash = "sha256:b756900b2ce2a66700fa183b4231ac2d63d0d03bcb6d1dba08c2905b9304a985", size = 692959, upload-time = "2026-06-10T14:05:29.936Z" },
+    { url = "https://files.pythonhosted.org/packages/b5/2c/44d47df76193b31fa4a7c662531076e6ec9a0f2f3017171f47c466211537/pyfaidx-0.9.0.4-py3-none-any.whl", hash = "sha256:18b223b7ba8c66b988a8ce00011500961cb2aeb7fa97d05a293cf472acdd0009", size = 29469, upload-time = "2026-03-19T19:02:57.213Z" },
 ]
 
 [[package]]
