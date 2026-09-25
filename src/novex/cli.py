@@ -101,16 +101,12 @@ def main() -> None:
 
     # stream: only junctions anchored in a query become objects, and only those passing
     # the motif screen are kept, so neither the whole BED nor a second copy is held
-    regions = query_regions(queries)
-    anchor = "donor" if args.direction == "up" else "acceptor"
     anchored = 0
     juncs = []
-    print("hello")
     for j in read_bed(args.junctions):
         anchored += 1
         if motif_ok(fa, j, args.motifs):
             juncs.append(j)
-    print("hello2")
     log(f"junctions | {len(juncs)}/{anchored} anchored in a query, with an allowed splice motif")
 
     prelim_references = read_references(args.reference, fmt=args.fmt)
