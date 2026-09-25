@@ -57,6 +57,11 @@ def get_args() -> argparse.Namespace:
         help="canonical | gtag | u12 | any | explicit pairs, e.g. GT-AG,AT-AC",
     )
     parser.add_argument(
+        "--min-cds-ratio", type=float, default=0.0,
+        help="reject constructs whose CDS is shorter than this fraction of the "
+             "reference transcript's CDS (0.0 = no filter)",
+    )
+    parser.add_argument(
         "--starts", type=parse_starts, default="atg",
         help="atg | near-cognate | any | explicit codons, e.g. ATG,CTG",
     )
@@ -95,11 +100,11 @@ def main() -> None:
 
     if args.direction == "up":
         constructs, rejections = build_all_upstream(
-            fetch, queries, JunctionIndex(juncs), CdsIndex(references)
+            fetch, queries, JunctionIndex(juncs), CdsIndex(references), args.min_cds_ratio
         )
     else:
         constructs, rejections = build_all_downstream(
-            fetch, queries, JunctionIndex(juncs), CdsIndex(references)
+            fetch, queries, JunctionIndex(juncs), CdsIndex(references), args.min_cds_ratio
         )
 
     counts = {reason: 0 for reason in RejectReason}

@@ -20,6 +20,7 @@ class RejectReason(StrEnum):
     PTC = "ptc" # premature stop
     DUPLICATE = "duplicate" # same CDS chain as a construct already built
     NOT_TRANSCRIBED = "not_transcribed"
+    LENGTH = "length" # construct CDS / reference CDS below the threshold
 
 # TODO: add a `direction` column so rejections from -d up and -d down runs can be told
 # apart once merged -- the reasons mean different things (downstream PTC = an in-frame stop
@@ -137,6 +138,7 @@ def build_all_upstream(
     queries: Iterable[OrfChain],
     junctions: JunctionIndex,
     references: CdsIndex,
+    min_cds_ratio: float = 0.0,
 ) -> tuple[list[Construct], list[Rejection]]:
     """Returns the constructs that passed check_orf, and one Rejection per candidate
     that did not (includes duplicate CDS chains).
@@ -167,6 +169,10 @@ def build_all_upstream(
                         f"splice failed for {u.id} + {r.id} across {j.chrom}:{j.intron}"
                     )
                 cds, exons = chains
+
+                if len(cds) / len(r.cds) < min_cds_ratio:
+                    reject(u.id, r.id, j, RejectReason.LENGTH)
+                    continue
 
                 if (r.chrom, r.strand, cds) in seen_chains:
                     reject(u.id, r.id, j, RejectReason.DUPLICATE)
@@ -286,6 +292,7 @@ def build_all_downstream(
     queries: Iterable[OrfChain],
     junctions: JunctionIndex,
     references: CdsIndex,
+    min_cds_ratio: float = 0.0,
 ) -> tuple[list[Construct], list[Rejection]]:
     """Same contract as build_all_upstream, for -d down.
 
@@ -329,6 +336,10 @@ def build_all_downstream(
                     continue
 
                 cds = result
+                if len(cds) / len(r.cds) < min_cds_ratio:
+                    reject(d.id, r.id, j, RejectReason.LENGTH)
+                    continue
+
                 key = (r.chrom, r.strand, cds)
                 if key in seen_chains:
                     reject(d.id, r.id, j, RejectReason.DUPLICATE)

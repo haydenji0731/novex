@@ -495,3 +495,34 @@ def test_build_all_downstream_minus_strand():
     (c,) = constructs
     assert c.cds == Chain([(52, 60), (100, 108)])     # trimmed at the stop, reading leftwards
     assert g.fetch(c.chrom, c.cds, c.strand) == "ATGAAAAAAGCCGCCTAA"
+
+
+# --- CDS length ratio filter --------------------------------------------------
+
+def test_length_filter_keeps_a_construct_at_or_above_the_threshold():
+    # construct CDS is 21 bases, reference CDS is 12 -> ratio 1.75
+    g, ups, juncs, refs = plus_setup()
+    constructs, rejections = build_all_upstream(g.fetch, ups, juncs, refs, 1.5)
+    assert len(constructs) == 1 and rejections == []
+
+
+def test_length_filter_rejects_a_construct_below_the_threshold():
+    g, ups, juncs, refs = plus_setup()
+    constructs, rejections = build_all_upstream(g.fetch, ups, juncs, refs, 2.0)
+    assert constructs == []
+    assert [r.reason for r in rejections] == [RejectReason.LENGTH]
+
+
+def test_length_filter_is_off_by_default():
+    g, ups, juncs, refs = plus_setup()
+    constructs, _ = build_all_upstream(g.fetch, ups, juncs, refs)
+    assert len(constructs) == 1
+
+
+def test_length_filter_applies_downstream_after_trimming():
+    # the trimmed CDS is 18 bases against a 9-base reference CDS -> ratio 2.0
+    g, qs, juncs, refs = down_setup()
+    assert len(build_all_downstream(g.fetch, qs, juncs, refs, 2.0)[0]) == 1
+    constructs, rejections = build_all_downstream(g.fetch, qs, juncs, refs, 2.5)
+    assert constructs == []
+    assert [r.reason for r in rejections] == [RejectReason.LENGTH]
