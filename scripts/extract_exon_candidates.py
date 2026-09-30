@@ -57,8 +57,6 @@ def trim_stop_codon(
             out[i] = (start + take, end)
         left -= take
 
-    if left:
-        raise ValueError(f"piece {pieces} is shorter than a stop codon")
     return out
 
 
@@ -105,6 +103,7 @@ def main() -> None:
     spans: dict[tuple, tuple[str, list[tuple[int, int]]]] = {}
     junctions: dict[tuple, dict[tuple[int, int], float | None]] = defaultdict(dict)
     tracked: dict[tuple, dict[int, list[str]]] = defaultdict(lambda: defaultdict(list))
+    stop_only = 0
 
     for n, path in enumerate(args.gtfs):
         for tid, query_id, chrom, strand, cds, intron, score, attr in read_constructs(path):
@@ -122,11 +121,15 @@ def main() -> None:
 
             pieces = get_novel_pieces(cds, intron, strand, direction)
 
-            if args.no_stop_codon:
-                pieces = trim_stop_codon(pieces, strand, direction)
-
             if not pieces:
                 raise ValueError(f"{path}: {tid} has no novel pieces?")
+
+            if args.no_stop_codon:
+                pieces = trim_stop_codon(pieces, strand, direction)
+                if not pieces:
+                    # the whole novel piece was the stop codon, or part of one
+                    stop_only += 1
+                    continue
 
             key = (chrom, strand, tuple(pieces))
             spans[key] = (query_id, pieces)
@@ -186,7 +189,8 @@ def main() -> None:
                 + "\n"
             )
 
-    print(f"wrote {bed} and {tracking} | {len(spans)} candidates from {len(args.gtfs)} file(s)")
+    note = f" | {stop_only} construct(s) dropped, stop codon was all they contributed" if stop_only else ""
+    print(f"wrote {bed} and {tracking} | {len(spans)} candidates from {len(args.gtfs)} file(s){note}")
 
 
 if __name__ == "__main__":
