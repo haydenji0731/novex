@@ -129,11 +129,10 @@ def main() -> None:
             found = [v for v in junctions[key].values() if v is not None]
             best = max(found) if found else None
             total = sum(found) if found else None
-            col5 = 0 if best is None else max(0, min(1000, round(best)))
 
             for start, end in piece:
                 fh.write(
-                    f"{chrom}\t{start - 1}\t{end}\t{names[key]}\t{col5}\t{strand}\t"
+                    f"{chrom}\t{start - 1}\t{end}\t{names[key]}\t.\t{strand}\t"
                     f"{len(junctions[key])}\t{'.' if best is None else f'{best:g}'}\t"
                     f"{'.' if total is None else f'{total:g}'}\n"
                 )
