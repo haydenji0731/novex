@@ -34,6 +34,34 @@ def get_novel_pieces(
     return [x for x in cds if x[0] >= base]
 
 
+def trim_stop_codon(
+    pieces: list[tuple[int, int]], strand: str, direction: str
+) -> list[tuple[int, int]]:
+    """Drop the 3 terminal bases of a downstream piece, i.e. its stop codon.
+    """
+    if direction != "down":
+        return pieces
+
+    out = list(pieces)
+    left = 3
+    while left and out:
+        # the query's 3' end: highest coordinate on +, lowest on -
+        i = -1 if strand == "+" else 0
+        start, end = out[i]
+        take = min(left, end - start + 1)
+        if take == end - start + 1:
+            out.pop(i)
+        elif strand == "+":
+            out[i] = (start, end - take)
+        else:
+            out[i] = (start + take, end)
+        left -= take
+
+    if left:
+        raise ValueError(f"piece {pieces} is shorter than a stop codon")
+    return out
+
+
 def read_constructs(path: Path):
     """Yield (transcript_id, query_id, chrom, strand, cds_intervals, junction, score, direction)."""
     cds: dict[str, list[tuple[int, int]]] = defaultdict(list)
@@ -69,6 +97,9 @@ def main() -> None:
     parser = argparse.ArgumentParser(description="", formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("gtfs", nargs="+", type=Path, help="one or more novex-generated constructs.gtf files")
     parser.add_argument("-o", "--prefix", default="candidates", help="output prefix [candidates]")
+    parser.add_argument(
+        "--no-stop-codon", action="store_true", help=""
+    )
     args = parser.parse_args()
 
     spans: dict[tuple, tuple[str, list[tuple[int, int]]]] = {}
@@ -77,8 +108,6 @@ def main() -> None:
 
     for n, path in enumerate(args.gtfs):
         for tid, query_id, chrom, strand, cds, intron, score, attr in read_constructs(path):
-            # the attribute is authoritative; the id prefix only covers GTFs written
-            # before novex carried direction
             if attr in ("up", "down"):
                 direction = attr
             elif tid.startswith("dst"):
@@ -92,6 +121,9 @@ def main() -> None:
                 )
 
             pieces = get_novel_pieces(cds, intron, strand, direction)
+
+            if args.no_stop_codon:
+                pieces = trim_stop_codon(pieces, strand, direction)
 
             if not pieces:
                 raise ValueError(f"{path}: {tid} has no novel pieces?")
@@ -116,41 +148,40 @@ def main() -> None:
             names[key] = f"{query_id}_c{i}"
 
     bed = Path(f"{args.prefix}.bed")
-    tracking = Path(f"{args.prefix}.tracking.tsv")
+    tracking = Path(f"{args.prefix}.tracking")
     ordered = sorted(spans, key=lambda k: (k[0], k[2][0][0]))
 
+    # strictly BED6: IGV parses columns 7-9 as thickStart/thickEnd/itemRgb, so extra
+    # columns there make it drop the feature. The metrics live in the tracking file.
     with open(bed, "w") as fh:
-        fh.write(
-            "#chrom\tstart\tend\tcandidate\tscore\tstrand\t"
-            "n_junctions\tmax_junction_score\tsum_junction_score\n"
-        )
+        fh.write("#chrom\tstart\tend\tcandidate\tscore\tstrand\n")
         for key in ordered:
             chrom, strand, piece = key
-            found = [v for v in junctions[key].values() if v is not None]
-            best = max(found) if found else None
-            total = sum(found) if found else None
-
             for start, end in piece:
-                fh.write(
-                    f"{chrom}\t{start - 1}\t{end}\t{names[key]}\t.\t{strand}\t"
-                    f"{len(junctions[key])}\t{'.' if best is None else f'{best:g}'}\t"
-                    f"{'.' if total is None else f'{total:g}'}\n"
-                )
+                fh.write(f"{chrom}\t{start - 1}\t{end}\t{names[key]}\t.\t{strand}\n")
 
     with open(tracking, "w") as fh:
         fh.write("# candidates -> constructs\n")
         for n, path in enumerate(args.gtfs, 1):
             fh.write(f"# file_{n} = {path}\n")
         cols = "\t".join(f"file_{n}" for n in range(1, len(args.gtfs) + 1))
-        fh.write(f"#candidate\tchrom\tstart\tend\tstrand\t{cols}\n")
+        fh.write(
+            "#candidate\tchrom\tstart\tend\tstrand\t"
+            f"n_junctions\tmax_junction_score\tsum_junction_score\t{cols}\n"
+        )
         for key in ordered:
             chrom, strand, piece = key
+            found = [v for v in junctions[key].values() if v is not None]
+            best = max(found) if found else None
+            total = sum(found) if found else None
             cells = [
                 ",".join(tracked[key][n]) if tracked[key].get(n) else "."
                 for n in range(len(args.gtfs))
             ]
             fh.write(
                 f"{names[key]}\t{chrom}\t{piece[0][0] - 1}\t{piece[-1][1]}\t{strand}\t"
+                f"{len(junctions[key])}\t{'.' if best is None else f'{best:g}'}\t"
+                f"{'.' if total is None else f'{total:g}'}\t"
                 + "\t".join(cells)
                 + "\n"
             )
