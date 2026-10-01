@@ -101,7 +101,11 @@ def main() -> None:
     args = parser.parse_args()
 
     spans: dict[tuple, tuple[str, list[tuple[int, int]]]] = {}
-    junctions: dict[tuple, dict[tuple[int, int], float | None]] = defaultdict(dict)
+    # candidate -> file -> junction -> score, kept per file: scores from different
+    # libraries are not commensurable, so they are reported side by side, never added
+    junctions: dict[tuple, dict[int, dict[tuple[int, int], float | None]]] = defaultdict(
+        lambda: defaultdict(dict)
+    )
     tracked: dict[tuple, dict[int, list[str]]] = defaultdict(lambda: defaultdict(list))
     stop_only = 0
 
@@ -134,9 +138,9 @@ def main() -> None:
             key = (chrom, strand, tuple(pieces))
             spans[key] = (query_id, pieces)
             value = None if score == "." else float(score)
-            prev = junctions[key].get(intron)
+            prev = junctions[key][n].get(intron)
             if prev is None or (value is not None and value > prev):
-                junctions[key][intron] = value
+                junctions[key][n][intron] = value
             tracked[key][n].append(tid)
 
     by_query: dict[str, list[tuple]] = defaultdict(list)
@@ -167,26 +171,30 @@ def main() -> None:
         fh.write("# candidates -> constructs\n")
         for n, path in enumerate(args.gtfs, 1):
             fh.write(f"# file_{n} = {path}\n")
-        cols = "\t".join(f"file_{n}" for n in range(1, len(args.gtfs) + 1))
-        fh.write(
-            "#candidate\tchrom\tstart\tend\tstrand\t"
-            f"n_junctions\tmax_junction_score\tsum_junction_score\t{cols}\n"
+        cols = "\t".join(
+            f"file_{n}\tfile_{n}_max\tfile_{n}_sum" for n in range(1, len(args.gtfs) + 1)
         )
+        fh.write(f"#candidate\tchrom\tstart\tend\tstrand\tn_junctions\t{cols}\n")
         for key in ordered:
             chrom, strand, piece = key
-            found = [v for v in junctions[key].values() if v is not None]
-            best = max(found) if found else None
-            total = sum(found) if found else None
-            cells = [
-                ",".join(tracked[key][n]) if tracked[key].get(n) else "."
-                for n in range(len(args.gtfs))
-            ]
+            per_file = junctions[key]
+            # pooled only as a count: the union of junctions over all files
+            n_junctions = len({j for seen in per_file.values() for j in seen})
+
+            cells = []
+            for n in range(len(args.gtfs)):
+                ids = tracked[key].get(n)
+                found = [v for v in per_file.get(n, {}).values() if v is not None]
+                # .10g keeps large counts out of scientific notation
+                cells += [
+                    ",".join(ids) if ids else ".",
+                    f"{max(found):.10g}" if found else ".",
+                    f"{sum(found):.10g}" if found else ".",
+                ]
+
             fh.write(
                 f"{names[key]}\t{chrom}\t{piece[0][0] - 1}\t{piece[-1][1]}\t{strand}\t"
-                f"{len(junctions[key])}\t{'.' if best is None else f'{best:g}'}\t"
-                f"{'.' if total is None else f'{total:g}'}\t"
-                + "\t".join(cells)
-                + "\n"
+                f"{n_junctions}\t" + "\t".join(cells) + "\n"
             )
 
     note = f" | {stop_only} construct(s) dropped, stop codon was all they contributed" if stop_only else ""
