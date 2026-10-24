@@ -1,5 +1,8 @@
 import argparse
+import json
 import sys
+from datetime import datetime, timezone
+from importlib.metadata import version
 from functools import partial
 from pathlib import Path
 
@@ -24,6 +27,7 @@ from novex.writer import write_gtf, write_rejections
 
 GTF_NAME = "constructs.gtf"
 REJECTIONS_NAME = "rejections.tsv"
+PARAMS_NAME = "params.json"
 
 
 def log(msg: str) -> None:
@@ -70,6 +74,31 @@ def get_args() -> argparse.Namespace:
     return parser.parse_args()
 
 
+def _param_value(value):
+    """JSON-friendly form of a parsed argument value."""
+    if isinstance(value, Path):
+        return str(value.resolve())
+    if isinstance(value, frozenset):  # --motifs pairs or --starts codons
+        return sorted("-".join(x) if isinstance(x, tuple) else x for x in value)
+    return value  # None for --motifs/--starts means no screening
+
+
+def run_params(args: argparse.Namespace, argv: list[str]) -> dict:
+    """What a run was asked to do: version, command line, and resolved arguments."""
+    return {
+        "novex_version": version("novex"),
+        "started": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        "command": argv,
+        "args": {k: _param_value(v) for k, v in vars(args).items()},
+    }
+
+
+def write_params(path: Path, params: dict) -> None:
+    with open(path, "w") as fh:
+        json.dump(params, fh, indent=2)
+        fh.write("\n")
+
+
 def query_regions(queries) -> dict[str, Chain]:
     """Merged genomic spans of the queries, per contig.
 
@@ -86,6 +115,8 @@ def query_regions(queries) -> dict[str, Chain]:
 def main() -> None:
     args = get_args()
     args.out_dir.mkdir(parents=True, exist_ok=True)
+    # written first, so a run that fails partway still records how it was called
+    write_params(args.out_dir / PARAMS_NAME, run_params(args, sys.argv))
 
     fa = load_genome(args.genome)
     fetch = partial(fetch_chain_seq, fa)
@@ -139,7 +170,7 @@ def main() -> None:
     gtf_path = args.out_dir / GTF_NAME
     write_gtf(gtf_path, constructs)
     write_rejections(args.out_dir / REJECTIONS_NAME, rejections)
-    log(f"wrote {gtf_path} and {args.out_dir / REJECTIONS_NAME}")
+    log(f"wrote {gtf_path}, {args.out_dir / REJECTIONS_NAME} and {args.out_dir / PARAMS_NAME}")
 
 
 

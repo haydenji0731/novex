@@ -5,7 +5,7 @@ reference coding sequences (CDS), using splice junctions supplied by the user.
 
 ## Output
 
-`--out-dir` receives two files:
+`--out-dir` receives three files:
 
 **`constructs.gtf`** — one `transcript` row per construct, then its `exon` and `CDS` rows.
 CDS rows **include the stop codon**, so no separate `stop_codon` feature is written. This
@@ -25,6 +25,11 @@ differs from GENCODE/Ensembl GTF, where CDS rows exclude it. Attributes:
 `not_transcribed` (no isoform of the reference transcribes the query ORF), `frame`,
 `no_stop`, `ptc` (premature stop), `length` (below `--min-cds-ratio`), `duplicate`
 (same CDS chain as a construct already built).
+
+**`params.json`** — how the run was invoked: novex version, UTC start time, the
+command line, and every argument after parsing (input paths made absolute, `--motifs` and
+`--starts` expanded to the pairs/codons they allow, `null` meaning no screening). Written
+before any work starts, so it exists even if the run fails.
 
 To get sequences, run [gffread](https://github.com/gpertea/gffread) on the GTF:
 
