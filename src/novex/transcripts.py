@@ -3,6 +3,7 @@
 
 from collections.abc import Iterable, Iterator
 from collections import defaultdict
+import re
 from dataclasses import dataclass, field
 from enum import StrEnum
 from pathlib import Path
@@ -15,6 +16,30 @@ from mjol.utils import load_attributes
 from novex.chains import Chain, Strand, GInterval
 
 fileFmt = Literal["gtf", "gff"]
+
+MANE_SELECT_TAG = "mane_select"
+
+
+def _norm_tag(tag: str) -> str:
+    """Case- and separator-insensitive form: GENCODE "MANE_Select" == RefSeq "MANE Select"."""
+    return tag.strip().lower().replace(" ", "_").replace("-", "_")
+_GTF_TAG = re.compile(r'(?:^|;)\s*tag\s+"?([^";]+)"?')
+
+
+def _parse_tags(raw: str, fmt: fileFmt) -> set[str]:
+    """All `tag` values in a column-9 string.
+
+    GTF repeats the key (tag "basic"; tag "MANE_Select";), which load_attributes collapses
+    to the last one, so GTF is scanned directly. GFF3 lists them comma-separated (tag=a,b).
+    """
+    if fmt == "gtf":
+        return set(_GTF_TAG.findall(raw))
+    tags: set[str] = set()
+    for x in raw.split(";"):
+        k, _, v = x.strip().partition("=")
+        if k == "tag":
+            tags.update(t.strip() for t in v.split(",") if t.strip())
+    return tags
 
 
 class StopConvention(StrEnum):
@@ -45,7 +70,16 @@ class RefTranscript(BaseModel, frozen=True):
     exons: Chain
     cds: Chain
     gene_id: str | None = None
+    mane_select: bool = False
     stop: StopConvention = StopConvention.UNDETECTED
+
+    def priority(self) -> tuple[bool, int, str]:
+        """Sort key for choosing among references that yield the same construct CDS.
+
+        MANE Select first, then the shorter transcript (total exon length), then id so the
+        order is deterministic. construct.py keeps the first reference per CDS chain.
+        """
+        return (not self.mane_select, len(self.exons), self.id)
 
     def copy_with_cds(self, cds: Chain, stop: StopConvention) -> "RefTranscript":
         """Copy with a normalized CDS chain and the detected convention.
@@ -61,6 +95,7 @@ class _TxGroup:
     cds: list[GInterval] = field(default_factory=list)
     exons: list[GInterval] = field(default_factory=list)
     gene_id: str | None = None
+    mane_select: bool = False
 
 
 def _iter_rows(
@@ -68,8 +103,8 @@ def _iter_rows(
     id_attr_key: str,
     fmt: fileFmt,
     keep: tuple[str, ...],
-) -> Iterator[tuple[str, str, str, Strand, GInterval, dict[str, str]]]:
-    """Yield (tx_id, feature_type, chrom, strand, interval, attributes) for rows in `keep`.
+) -> Iterator[tuple[str, str, str, Strand, GInterval, dict[str, str], set[str]]]:
+    """Yield (tx_id, feature_type, chrom, strand, interval, attributes, tags) for rows in `keep`.
     """
     with open(path) as fh:
         for lineno, line in enumerate(fh, 1):
@@ -95,6 +130,7 @@ def _iter_rows(
                 Strand(strand),
                 GInterval(start=int(start), end=int(end)),
                 attrs,
+                _parse_tags(f[8], fmt),
             )
 
 
@@ -108,7 +144,7 @@ def _group_by_tx(
     """Group rows by transcript id.
     """
     data: dict[str, _TxGroup] = {}
-    for tx_id, ftype, chrom, strand, interval, attrs in _iter_rows(path, id_attr_key, fmt, keep):
+    for tx_id, ftype, chrom, strand, interval, attrs, tags in _iter_rows(path, id_attr_key, fmt, keep):
         grp = data.get(tx_id)
 
         if grp is None:
@@ -117,6 +153,8 @@ def _group_by_tx(
 
         elif (grp.chrom, grp.strand) != (chrom, strand):
             raise ValueError(f"{path}: rows for {tx_id} disagree on contig or strand")
+        if any(_norm_tag(t) == MANE_SELECT_TAG for t in tags):
+            grp.mane_select = True
         (grp.cds if ftype == "CDS" else grp.exons).append(interval)
     return data
 
@@ -152,6 +190,7 @@ def read_references(
             exons=Chain(sorted(g.exons or g.cds)),
             cds=Chain(sorted(g.cds)),
             gene_id=g.gene_id,
+            mane_select=g.mane_select,
         )
         for tx_id, g in data.items()
         if g.cds
@@ -178,9 +217,12 @@ class CdsIndex:
         return len(self._transcripts)
 
     def containing(self, chrom: str, strand: Strand, pos: int) -> list[RefTranscript]:
-        """Transcripts on (chrom, strand) whose CDS covers `pos`.
+        """Transcripts on (chrom, strand) whose CDS covers `pos`, best first.
+
+        Order follows RefTranscript.priority (MANE Select, then shorter, then id): when
+        several references give the same construct CDS, the first one wins.
         """
         tree = self._trees.get((chrom, strand))
         if tree is None:
             return []
-        return sorted({x.data for x in tree.at(pos)}, key=lambda t: t.id)
+        return sorted({x.data for x in tree.at(pos)}, key=RefTranscript.priority)
